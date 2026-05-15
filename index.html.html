@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<title>Ikkilik Guli — G'oliblar E'loni</title>
+<style>
+/* 🎨 INTERFEYS */
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+    font-family:'Segoe UI', sans-serif;
+    background: linear-gradient(180deg, #e0f2fe 0%, #f0fdf4 100%);
+    min-height: 100vh; padding: 20px; overflow-x: hidden;
+}
+.container{max-width:800px;margin:0 auto;}
+.card{background:rgba(255,255,255,0.95); border-radius:24px; padding:25px; border:5px solid #fce7f3; box-shadow:0 10px 30px rgba(190,24,93,0.1); margin-bottom:20px;}
+
+#fireworks{position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2000;}
+
+.garden-row{display:flex; gap:15px; margin-bottom:20px;}
+.garden-box{flex:1; border:3px dashed #86efac; border-radius:20px; padding:15px; background:#fff; text-align:center; transition:0.3s;}
+
+.petal-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
+.petal{
+    aspect-ratio:1; background:#fff; border:3.5px solid #ddd6fe; border-radius:50% 50% 10% 50%;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 0 #ddd6fe; transition:0.1s;
+}
+.petal-num{font-size:24px; font-weight:900; color:#7c3aed;}
+.petal.used{opacity:0.3; filter:grayscale(1); cursor:default;}
+
+/* MODAL */
+.modal-overlay{display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1100; align-items:center; justify-content:center;}
+.modal-overlay.show{display:flex;}
+.modal{background:#fff; border-radius:35px; padding:30px; max-width:480px; width:90%; border:6px solid #be185d; text-align:center; position:relative;}
+.ch-btn{padding:12px; border-radius:12px; border:3px solid #e0d6f5; background:#fff; font-size:17px; font-weight:700; cursor:pointer; width:100%; margin:5px 0;}
+.start-btn{width:100%; padding:15px; border-radius:15px; border:none; background:#be185d; color:#fff; font-size:18px; font-weight:800; cursor:pointer; margin-top:10px; box-shadow: 0 5px 0 #9d174d;}
+
+/* G'OLIB EKRANI */
+#winner-screen{display:none; text-align:center;}
+.winner-cup{font-size:80px; margin-bottom:10px; display:block;}
+.winner-name{font-size:36px; font-weight:900; color:#be185d; margin-bottom:10px;}
+</style>
+</head>
+<body>
+
+<canvas id="fireworks"></canvas>
+
+<div class="container">
+    <h1 style="text-align:center; color:#be185d; margin-bottom:15px; font-size:32px;">🌸 Ikkilik Guli — Musobaqa</h1>
+
+    <div id="setup-screen" class="card">
+        <h3 style="margin-bottom:15px;">Guruh nomlarini kiriting:</h3>
+        <input type="text" id="t1" placeholder="1-guruh nomi" style="width:100%; padding:12px; margin-bottom:10px; border-radius:10px; border:2px solid #ddd;">
+        <input type="text" id="t2" placeholder="2-guruh nomi" style="width:100%; padding:12px; margin-bottom:10px; border-radius:10px; border:2px solid #ddd;">
+        <button class="start-btn" onclick="startGame()">🌱 O'yinni boshlash</button>
+    </div>
+
+    <div id="game-screen" style="display:none;">
+        <div id="garden-row" class="garden-row"></div>
+        <div class="card">
+            <p id="turn-info" style="text-align:center; font-weight:800; font-size:22px; margin-bottom:15px;"></p>
+            <div id="petal-grid" class="petal-grid"></div>
+        </div>
+    </div>
+
+    <div id="winner-screen" class="card">
+        <span class="winner-cup">🏆</span>
+        <h2 style="color:#1e293b;">TABRIKLAYMIZ!</h2>
+        <div class="winner-name" id="winner-display"></div>
+        <p id="winner-score" style="font-size:20px; font-weight:600;"></p>
+        <button class="start-btn" onclick="location.reload()" style="background:#3b82f6; box-shadow:0 5px 0 #1d4ed8;">Qayta o'ynash 🔄</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal">
+    <div class="modal">
+        <div id="modal-q" style="font-size:20px; font-weight:800; margin-bottom:15px;"></div>
+        <div id="choices"></div>
+        <div id="motivation-msg" style="margin:15px 0; font-weight:800; font-size:20px;"></div>
+        <button class="start-btn" id="close-btn" style="display:none;" onclick="closeModal()">Davom etish ▶</button>
+    </div>
+</div>
+
+<script>
+const QUESTIONS = [
+    {q:'13 soni ikkilikda qanday yoziladi?', c:['1101','1011','1110','1001'], a:'1101'},
+    {q:'25 soni ikkilikda qanday yoziladi?', c:['11001','10110','11010','10011'], a:'11001'},
+    {q:'1 bayt necha bitga teng?', c:['8','4','16','10'], a:'8'},
+    {q:'1010₂ o\'nlikda nechaga teng?', c:['10','8','12','9'], a:'10'},
+    {q:'"Tok bor" holati qaysi raqam?', c:['1','0','2','8'], a:'1'},
+    {q:'Informatika fani asosi qaysi sanoq tizimi?', c:['Ikkilik','O\'nlik','Sakkizlik','Rim'], a:'Ikkilik'},
+    {q:'8 bit nimaga teng?', c:['1 bayt','1 KB','0.5 bayt','2 bayt'], a:'1 bayt'},
+    {q:'Ikkilik tizim asosi nechaga teng?', c:['2','10','8','16'], a:'2'}
+];
+
+let teams = [], currentTeam = 0, usedCount = 0;
+
+function startGame() {
+    const n1 = document.getElementById('t1').value || '1-Guruh';
+    const n2 = document.getElementById('t2').value || '2-Guruh';
+    teams = [
+        {name: n1, score: 0, flowers: '', color: '#be185d'},
+        {name: n2, score: 0, flowers: '', color: '#3b82f6'}
+    ];
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('game-screen').style.display = 'block';
+    renderGarden();
+    renderPetals();
+    updateTurn();
+}
+
+function renderGarden() {
+    document.getElementById('garden-row').innerHTML = teams.map((t, i) => `
+        <div class="garden-box" style="border-color:${t.color}">
+            <div style="color:${t.color}; font-weight:800;">${t.name}</div>
+            <div style="font-size:25px; margin:5px 0;">${t.flowers || '🌱'}</div>
+            <div style="font-weight:900; font-size:20px;">${t.score} ball</div>
+        </div>
+    `).join('');
+}
+
+function renderPetals() {
+    const grid = document.getElementById('petal-grid');
+    grid.innerHTML = '';
+    for(let i=0; i<8; i++) {
+        grid.innerHTML += `<div class="petal" onclick="openQ(${i}, this)"><span class="petal-num">${i+1}</span></div>`;
+    }
+}
+
+function updateTurn() {
+    const t = teams[currentTeam];
+    document.getElementById('turn-info').innerHTML = `<span style="color:${t.color}">${t.name}</span> navbati! 🌸`;
+}
+
+function openQ(idx, el) {
+    if(el.classList.contains('used')) return;
+    currentPetal = el;
+    const q = QUESTIONS[idx];
+    document.getElementById('modal-q').textContent = q.q;
+    document.getElementById('choices').innerHTML = q.c.map(c => `<button class="ch-btn" onclick="check('${c}','${q.a}', this)">${c}</button>`).join('');
+    document.getElementById('motivation-msg').textContent = '';
+    document.getElementById('close-btn').style.display = 'none';
+    document.getElementById('modal').classList.add('show');
+}
+
+function check(val, ans, btn) {
+    const msg = document.getElementById('motivation-msg');
+    document.querySelectorAll('.ch-btn').forEach(b => b.disabled = true);
+    if(val === ans) {
+        btn.style.background = "#dcfce7";
+        msg.textContent = "BARAKALLA! 🎉";
+        msg.style.color = "#16a34a";
+        teams[currentTeam].score += 10;
+        teams[currentTeam].flowers += '🌸';
+        startFireworks();
+    } else {
+        btn.style.background = "#fee2e2";
+        msg.textContent = "Xato emas, tajriba! 💪";
+        msg.style.color = "#be185d";
+    }
+    currentPetal.classList.add('used');
+    usedCount++;
+    renderGarden();
+    document.getElementById('close-btn').style.display = 'block';
+}
+
+function closeModal() {
+    document.getElementById('modal').classList.remove('show');
+    if(usedCount === 8) {
+        showWinner();
+    } else {
+        currentTeam = (currentTeam + 1) % teams.length;
+        updateTurn();
+    }
+}
+
+function showWinner() {
+    document.getElementById('game-screen').style.display = 'none';
+    const winSc = document.getElementById('winner-screen');
+    winSc.style.display = 'block';
+    
+    let winner = teams[0].score > teams[1].score ? teams[0] : (teams[1].score > teams[0].score ? teams[1] : null);
+    
+    if(winner) {
+        document.getElementById('winner-display').textContent = winner.name;
+        document.getElementById('winner-score').textContent = winner.score + " ball bilan g'olib bo'ldi!";
+        document.getElementById('winner-display').style.color = winner.color;
+    } else {
+        document.getElementById('winner-display').textContent = "DO'STLIK G'ALABA QILDI!";
+        document.getElementById('winner-score').textContent = "Ikkala guruh ham " + teams[0].score + " ball to'pladi!";
+    }
+    setInterval(startFireworks, 1500); // G'olib uchun tinimsiz salyut
+}
+
+/* 🎆 SALYUT LOGIKASI */
+const canvas = document.getElementById('fireworks');
+const ctx = canvas.getContext('2d');
+let particles = [];
+function startFireworks() {
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    for(let i=0; i<80; i++) {
+        particles.push({
+            x: canvas.width/2, y: canvas.height/2,
+            vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15,
+            c: `hsl(${Math.random()*360}, 100%, 50%)`, r: Math.random()*5
+        });
+    }
+    animate();
+}
+function animate() {
+    ctx.clearRect(0,0,canvas.width, canvas.height);
+    particles.forEach((p, i) => {
+        p.x += p.vx; p.y += p.vy; p.vy += 0.2;
+        ctx.fillStyle = p.c;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+        if(p.y > canvas.height) particles.splice(i, 1);
+    });
+    if(particles.length > 0) requestAnimationFrame(animate);
+}
+</script>
+</body>
+</html>
